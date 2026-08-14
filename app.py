@@ -1,105 +1,274 @@
 import streamlit as st
 import pandas as pd
-import replicate
-import time
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Atelier Virtual - Cotizador & IA", layout="wide", page_icon="👗")
+st.set_page_config(
+    page_title="Atelier Virtual | Cotizador de Alta Costura",
+    layout="wide",
+    page_icon="👗"
+)
 
-st.title("👗 Atelier Virtual: Personalización & Probador con IA")
-st.write("Prototipo interactivo de diseño de prendas a la medida y visualización en tiempo real.")
+# --- ESTILOS CSS PERSONALIZADOS (ESTÉICA DE LUJO) ---
+st.markdown("""
+    <style>
+    .main {
+        background-color: #fafafa;
+    }
+    .stMetric {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        border: 1px solid #eaeaea;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 10px 20px;
+        border: 1px solid #e0e0e0;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #1e1e1e !important;
+        color: #ffffff !important;
+    }
+    div[data-testid="stExpander"] {
+        background-color: #ffffff;
+        border-radius: 8px;
+        border: 1px solid #eaeaea;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# --- BASE DE DATOS DE PRECIOS ---
-PRECIOS_TELAS = {
-    "Seda de Mora": 45.0,
-    "Raso Satinado": 25.0,
-    "Encaje Francés": 60.0,
-    "Tul Bordado": 35.0,
-    "Algodón Lino": 18.0
+# --- ENCABEZADO PRINCIPAL ---
+st.title("👗 Atelier Virtual: Cotizador de Alta Costura")
+st.caption("Sistema profesional de estimación de costos, personalización de prendas a la medida y presupuestos en tiempo real.")
+st.markdown("---")
+
+# --- CATALOGOS Y TARIFAS ---
+TELAS = {
+    "Seda de Mora Orgánica": 65.0,
+    "Raso Satinado de Seda": 40.0,
+    "Encaje Francés Chantilly": 85.0,
+    "Tul Bordado en Hilos de Seda": 55.0,
+    "Mikado de Seda Estructurado": 70.0,
+    "Gasa / Chiffon de Seda": 35.0,
+    "Organza Orgánica Crispy": 38.0,
+    "Terciopelo de Seda Premium": 60.0,
+    "Algodón Lino Italiano": 28.0
 }
 
-COSTO_BASE_CONFECCION = 150.0
+SILUETAS = {
+    "A-Line / Línea A (Clásica)": 0.0,
+    "Sirena / Mermaid (Ajustado)": 60.0,
+    "Princesa / Ballgown (Volumen Alto)": 110.0,
+    "Corte Recto / Columna Minimalista": 20.0,
+    "Evasé Fluido": 30.0,
+    "Asimétrico Avant-Garde": 90.0
+}
 
-# --- ESTRUCTURA EN COLUMNAS ---
-col_controles, col_visualizador = st.columns([1, 1])
+ESCOTES = {
+    "Corazón Trapeado": 25.0,
+    "Escote en V Profundo": 20.0,
+    "Bandeau / Strapless Rígido": 35.0,
+    "Cuello Alto / Halter Solemne": 15.0,
+    "Hombros Caídos / Off-Shoulder": 40.0,
+    "Ilusión en Encaje Transparente": 50.0
+}
 
-with col_controles:
-    st.header("1. Personaliza tu Vestido")
-    
-    tela_seleccionada = st.selectbox("Selecciona la Tela:", list(PRECIOS_TELAS.keys()))
-    metros_tela = st.slider("Metros de tela estimados:", min_value=2.0, max_value=8.0, value=3.5, step=0.5)
-    
-    corte = st.selectbox("Tipo de Corte / Silueta:", ["A-Line", "Sirena", "Princesa", "Recto"])
-    escote = st.selectbox("Tipo de Escote:", ["Corazón", "En V", "Bandeau", "Cuello Alto"])
-    
-    detalles_extra = st.multiselect(
-        "Detalles Adicionales:",
-        ["Pedrería (+$80)", "Manga Larga (+$40)", "Cola Larga (+$50)"]
-    )
+ESPALDAS = {
+    "Espalda Descubierta Profunda": 35.0,
+    "Abotonadura de Cristal de la Cera (Manual)": 50.0,
+    "Espalda en V Clásica": 15.0,
+    "Corsé Ajustable con Lazos": 45.0,
+    "Espalda Cerrada Tradicional": 0.0
+}
 
-    # Lógica de Precios en Tiempo Real
-    costo_tela = PRECIOS_TELAS[tela_seleccionada] * metros_tela
-    costo_extras = sum([80 if "Pedrería" in d else 40 if "Manga" in d else 50 for d in detalles_extra])
-    precio_total = COSTO_BASE_CONFECCION + costo_tela + costo_extras
+MANGAS = {
+    "Sin Mangas / Tirantes": 0.0,
+    "Manga Corta / Cap Sleeve": 25.0,
+    "Manga 3/4 en Encaje": 45.0,
+    "Manga Larga de Tul con Aplicaciones": 75.0,
+    "Manga Abullonada / Bishop Sleeve": 60.0
+}
+
+ESTRUCTURA_INTERNA = {
+    "Forro Estándar Suave": 30.0,
+    "Corsé Interno con Varillas de Acero": 120.0,
+    "Copas Estructuradas Integradas": 40.0,
+    "Enagua / Cancán de Tul Multicapa": 70.0
+}
+
+DETALLES_EXTRA = {
+    "Bordado en Pedrería Fina a Mano": 180.0,
+    "Aplicaciones de Encaje Rebrodé": 110.0,
+    "Plumas Naturales en Ruedo/Escote": 140.0,
+    "Cola Real Desmontable (2 metros)": 160.0,
+    "Cinturón con Cristales Swarovski": 85.0,
+    "Velo Cathedral a Juego (3 metros)": 130.0
+}
+
+COSTO_BASE_MANO_OBRA = 200.0  # Base de patronaje y confección
+
+# --- LAYOUT PRINCIPAL (2 COLUMNAS) ---
+col_formulario, col_resumen = st.columns([1.6, 1], gap="large")
+
+with col_formulario:
+    st.subheader("🛠️ Configuración de la Prenda")
+    
+    # PESTAÑAS PASO A PASO
+    tab_telas, tab_diseno, tab_detalles, tab_servicio = st.tabs([
+        "1. 🧵 Materiales", 
+        "2. ✂️ Silueta & Diseño", 
+        "3. ✨ Detalles VIP", 
+        "4. ⏱️ Tiempo & Pruebas"
+    ])
+
+    with tab_telas:
+        st.markdown("##### Selección de Textiles y Estructura")
+        tela_sel = st.selectbox("Tipo de Tela Principal:", list(TELAS.keys()))
+        metros_sel = st.slider("Metros de tela requeridos:", min_value=2.0, max_value=12.0, value=4.5, step=0.5)
+        
+        st.markdown("---")
+        st.markdown("##### Refuerzo y Corsetería Interna")
+        estructura_sel = st.multiselect(
+            "Acabados e Interiores:",
+            list(ESTRUCTURA_INTERNA.keys()),
+            default=["Forro Estándar Suave"]
+        )
+
+    with tab_diseno:
+        st.markdown("##### Silueta y Cortes Principales")
+        corte_col1, corte_col2 = st.columns(2)
+        with corte_col1:
+            silueta_sel = st.selectbox("Corte / Silueta:", list(SILUETAS.keys()))
+            escote_sel = st.selectbox("Tipo de Escote:", list(ESCOTES.keys()))
+        with corte_col2:
+            espalda_sel = st.selectbox("Diseño de Espalda:", list(ESPALDAS.keys()))
+            manga_sel = st.selectbox("Estilo de Mangas:", list(MANGAS.keys()))
+
+    with tab_detalles:
+        st.markdown("##### Aplicaciones y Adornos Hechos a Mano")
+        detalles_sel = st.multiselect(
+            "Selecciona los elementos decorativos adicionales:",
+            list(DETALLES_EXTRA.keys())
+        )
+
+    with tab_servicio:
+        st.markdown("##### Prioridad de Entrega y Experiencia")
+        tiempo_entrega = st.radio(
+            "Tiempo de Confección:",
+            ["Estándar (6 - 8 Semanas)", "Prioritario (3 - 4 Semanas) [ +15% ]", "Express de Emergencia (1 - 2 Semanas) [ +30% ]"]
+        )
+        
+        pruebas_sel = st.select_slider(
+            "Número de Pruebas de Vestuario (Fittings):",
+            options=["2 Pruebas (Incluidas)", "3 Pruebas (+ $40)", "5 Pruebas VIP con Diseñadora (+ $90)"]
+        )
+
+# --- CÁLCULOS DE PRECIOS ---
+costo_materia_prima = TELAS[tela_sel] * metros_sel
+costo_estructura = sum([ESTRUCTURA_INTERNA[item] for item in estructura_sel])
+costo_diseno = SILUETAS[silueta_sel] + ESCOTES[escote_sel] + ESPALDAS[espalda_sel] + MANGAS[manga_sel]
+costo_detalles = sum([DETALLES_EXTRA[item] for item in detalles_sel])
+
+costo_pruebas = 0.0
+if "3 Pruebas" in pruebas_sel:
+    costo_pruebas = 40.0
+elif "5 Pruebas" in pruebas_sel:
+    costo_pruebas = 90.0
+
+subtotal = COSTO_BASE_MANO_OBRA + costo_materia_prima + costo_estructura + costo_diseno + costo_detalles + costo_pruebas
+
+# Multiplicador por tiempo de entrega
+multiplicador_urgencia = 1.0
+if "Prioritario" in tiempo_entrega:
+    multiplicador_urgencia = 1.15
+elif "Express" in tiempo_entrega:
+    multiplicador_urgencia = 1.30
+
+precio_total_final = subtotal * multiplicador_urgencia
+recargo_urgencia_monto = precio_total_final - subtotal
+
+# --- COLUMNA DE RESUMEN Y COTIZACIÓN ---
+with col_resumen:
+    st.subheader("📊 Cotización Oficial")
+    
+    # DATOS DE LA CLIENTA
+    with st.expander("👤 Datos de la Clienta / Evento", expanded=True):
+        nombre_clienta = st.text_input("Nombre de la Clienta:", value="María Fernanda López")
+        tipo_evento = st.selectbox("Tipo de Evento:", ["Boda / Novia", "Gala / Copenhague", "Graduación VIP", "XV Años / Quinceañera", "Cocktail de Lujo"])
 
     st.markdown("---")
-    st.subheader("💰 Cotización en Tiempo Real")
-    st.metric(label="Precio Total Estimado", value=f"${precio_total:.2f} USD")
     
-    with st.expander("Ver desglose del precio"):
-        st.write(f"- Confección base: **${COSTO_BASE_CONFECCION:.2f} USD**")
-        st.write(f"- Tela ({tela_seleccionada} x {metros_tela}m): **${costo_tela:.2f} USD**")
-        st.write(f"- Adicionales: **${costo_extras:.2f} USD**")
+    # MÉTRICAS DESTACADAS
+    st.metric(
+        label="💰 PRECIO TOTAL ESTIMADO", 
+        value=f"${precio_total_final:,.2f} USD",
+        delta=f"+${recargo_urgencia_monto:,.2f} USD por Urgencia" if recargo_urgencia_monto > 0 else "Precio Estándar"
+    )
 
-with col_visualizador:
-    st.header("2. Probador Virtual (IA)")
+    st.markdown("##### 📈 Desglose Técnico de Costos")
     
-    # Interruptor para el modo Demo (Desactivado por defecto para usar IA REAL)
-    modo_demo = st.toggle("🧪 Activar Modo Demo (Simulación)", value=False)
+    # DATAFRAME PARA EL GRÁFICO Y TABLA
+    df_desglose = pd.DataFrame({
+        "Concepto": ["Confección Base", "Textil Principal", "Corsetería/Estructura", "Cortes y Diseño", "Bordados/Detalles", "Servicios/Pruebas"],
+        "Costo (USD)": [COSTO_BASE_MANO_OBRA, costo_materia_prima, costo_estructura, costo_diseno, costo_detalles, costo_pruebas]
+    })
     
-    foto_cliente = st.file_uploader("Sube la foto de la clienta", type=["jpg", "png", "jpeg"])
-    foto_vestido = st.file_uploader("Sube la foto/diseño del vestido", type=["jpg", "png", "jpeg"])
-    
-    default_token = st.secrets.get("REPLICATE_API_TOKEN", "")
-    api_key = st.text_input("Replicate API Token:", value=default_token, type="password")
+    # GRÁFICO BARRAS STREAMLIT
+    st.bar_chart(df_desglose.set_index("Concepto"))
 
-    if st.button("✨ Generar Visualización con IA", use_container_width=True):
-        if modo_demo:
-            # MODO DEMO: Simulación rápida
-            with st.spinner("Procesando simulación... (~2 segundos)"):
-                time.sleep(2)
-                st.image(
-                    "https://placehold.co/800x1200/png?text=Visualizacion+Simulada", 
-                    caption="Resultado del Probador Virtual (Modo Demo)", 
-                    use_container_width=True
-                )
-                st.success("¡Visualización simulada completada!")
-        else:
-            # MODO REAL: Procesa las fotos de la clienta y el vestido con IA
-            if not foto_cliente or not foto_vestido:
-                st.warning("⚠️ Por favor sube ambas imágenes (Foto de la clienta y Foto del vestido).")
-            elif not api_key:
-                st.error("🔑 Ingresa un API Token de Replicate válido para continuar.")
-            else:
-                with st.spinner("🧠 La IA está vistiendo a la clienta con el diseño... (~12-15 segundos)"):
-                    try:
-                        # Reiniciar el puntero de las imágenes subidas
-                        foto_cliente.seek(0)
-                        foto_vestido.seek(0)
-                        
-                        client = replicate.Client(api_token=api_key)
-                        
-                        output = client.run(
-                            "yisol/idm-vton:c871d0b19165cb70e7db9294191653f5383501f2e82f3c2f0f49f80a480572b8",
-                            input={
-                                "human_img": foto_cliente,
-                                "garm_img": foto_vestido,
-                                "description": f"A {corte} dress with {escote} neckline, made of {tela_seleccionada}",
-                                "category": "dresses"
-                            }
-                        )
-                        st.image(output, caption="✨ Resultado Real del Probador Virtual con IA", use_container_width=True)
-                        st.success("¡Visualización generada con éxito por la IA!")
-                    except Exception as e:
-                        st.error(f"Error al conectar con la IA: {e}")
-                        st.info("💡 Tip: Si te aparece un error de límite de peticiones (429), espera 5 segundos y vuelve a presionar el botón.")
+    # DETALLE DESPLEGABLE
+    with st.expander("🔍 Ver Desglose Detallado"):
+        st.write(f"• **Confección Base:** ${COSTO_BASE_MANO_OBRA:.2f} USD")
+        st.write(f"• **Tela ({tela_sel} x {metros_sel}m):** ${costo_materia_prima:.2f} USD")
+        st.write(f"• **Corsetería/Forros:** ${costo_estructura:.2f} USD")
+        st.write(f"• **Personalización de Diseño:** ${costo_diseno:.2f} USD")
+        st.write(f"• **Bordados y Aplicaciones:** ${costo_detalles:.2f} USD")
+        st.write(f"• **Pruebas de Ajuste:** ${costo_pruebas:.2f} USD")
+        if recargo_urgencia_monto > 0:
+            st.write(f"• **Tarifa de Confección Acelerada:** ${recargo_urgencia_monto:.2f} USD")
+
+    # GENERAR ARCHIVO DE RESUMEN PARA DESCARGAR
+    resumen_texto = f"""
+    ==================================================
+                 ATELIER VIRTUAL - COTIZACIÓN
+    ==================================================
+    Clienta: {nombre_clienta}
+    Tipo de Evento: {tipo_evento}
+    
+    DETALLES DEL DISEÑO:
+    - Tela: {tela_sel} ({metros_sel}m)
+    - Silueta: {silueta_sel}
+    - Escote: {escote_sel}
+    - Espalda: {espalda_sel}
+    - Mangas: {manga_sel}
+    - Estructura Interna: {', '.join(estructura_sel) if estructura_sel else 'Ninguna'}
+    - Adicionales: {', '.join(detalles_sel) if detalles_sel else 'Ninguno'}
+    - Tiempo de Entrega: {tiempo_entrega}
+    - Pruebas: {pruebas_sel}
+    
+    --------------------------------------------------
+    DESGLOSE ECONÓMICO:
+    - Confección Base: ${COSTO_BASE_MANO_OBRA:.2f} USD
+    - Tela: ${costo_materia_prima:.2f} USD
+    - Estructura/Forros: ${costo_estructura:.2f} USD
+    - Diseño y Cortes: ${costo_diseno:.2f} USD
+    - Detalles VIP: ${costo_detalles:.2f} USD
+    - Pruebas/Fittings: ${costo_pruebas:.2f} USD
+    - Recargo Urgencia: ${recargo_urgencia_monto:.2f} USD
+    --------------------------------------------------
+    PRECIO TOTAL ESTIMADO: ${precio_total_final:,.2f} USD
+    ==================================================
+    """
+
+    st.download_button(
+        label="📄 Descargar Cotización Oficial (.txt)",
+        data=resumen_texto,
+        file_name=f"Cotizacion_{nombre_clienta.replace(' ', '_')}.txt",
+        mime="text/plain",
+        use_container_width=True
+    )
