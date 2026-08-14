@@ -55,6 +55,7 @@ with col_visualizador:
     st.header("2. Probador Virtual (IA)")
     
     # Interruptor para el modo Demo/A prueba de fallos
+    # Cambiado a value=True por defecto para garantizar éxito visual en la demo
     modo_demo = st.toggle("🧪 Activar Modo Demo (Simulación rápida para presentación)", value=True)
     
     foto_cliente = st.file_uploader("Sube la foto de la clienta", type=["jpg", "png", "jpeg"])
@@ -65,12 +66,13 @@ with col_visualizador:
 
     if st.button("✨ Generar Visualización con IA", use_container_width=True):
         if modo_demo:
-            # MODO DEMO: Muestra una imagen de ejemplo garantizada sin dependencias externas
+            # MODO DEMO: Muestra una imagen de marcador de posición garantizada y profesional
             with st.spinner("Procesando renderizado de la prenda... (~2 segundos)"):
                 time.sleep(2)
+                # NUEVO ENLACE DE IMAGEN DE MARCADOR DE POSICIÓN (Placeholder) robusto
                 st.image(
-                    "https://raw.githubusercontent.com/yisol/IDM-VTON/main/assets/demos/demo_2.png", 
-                    caption="Resultado del Probador Virtual (Simulación para Presentación)", 
+                    "https://placehold.co/800x1200/png?text=Visualización+Simulada&font=raleway", 
+                    caption="Resultado del Probador Virtual (Simulado para Presentación)", 
                     use_container_width=True
                 )
                 st.success("¡Visualización completada con éxito!")
