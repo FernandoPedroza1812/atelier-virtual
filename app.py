@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import replicate
+import time
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Atelier Virtual - Cotizador & IA", layout="wide", page_icon="👗")
@@ -56,7 +57,6 @@ with col_visualizador:
     foto_cliente = st.file_uploader("Sube la foto de la clienta", type=["jpg", "png", "jpeg"])
     foto_vestido = st.file_uploader("Sube la foto/diseño del vestido", type=["jpg", "png", "jpeg"])
     
-    # Token de Replicate (lee de las claves guardadas o del cuadro de texto)
     default_token = st.secrets.get("REPLICATE_API_TOKEN", "")
     api_key = st.text_input("Replicate API Token:", value=default_token, type="password")
 
@@ -66,18 +66,26 @@ with col_visualizador:
         elif not api_key:
             st.error("🔑 Ingresa un API Token de Replicate para continuar.")
         else:
-            with st.spinner("Procesando imagen con IA... (~10 segundos)"):
-                try:
-                    client = replicate.Client(api_token=api_key)
-                    output = client.run(
-                        "yisol/idm-vton:c871d0b19165cb70e7db9294191653f5383501f2e82f3c2f0f49f80a480572b8",
-                        input={
-                            "human_img": foto_cliente,
-                            "garm_img": foto_vestido,
-                            "description": f"A {corte} dress with {escote} neckline, made of {tela_seleccionada}"
-                        }
-                    )
-                    st.image(output, caption="Resultado del Probador Virtual", use_container_width=True)
-                    st.success("¡Visualización completada!")
-                except Exception as e:
-                    st.error(f"Error al conectar con la IA: {e}")
+            with st.spinner("Procesando imagen con IA... (~10-15 segundos)"):
+                client = replicate.Client(api_token=api_key)
+                max_intentos = 3
+                
+                for intento in range(max_intentos):
+                    try:
+                        output = client.run(
+                            "yisol/idm-vton:c871d0b19165cb70e7db9294191653f5383501f2e82f3c2f0f49f80a480572b8",
+                            input={
+                                "human_img": foto_cliente,
+                                "garm_img": foto_vestido,
+                                "description": f"A {corte} dress with {escote} neckline, made of {tela_seleccionada}"
+                            }
+                        )
+                        st.image(output, caption="Resultado del Probador Virtual", use_container_width=True)
+                        st.success("¡Visualización completada con éxito!")
+                        break
+                    except Exception as e:
+                        if "429" in str(e) and intento < max_intentos - 1:
+                            time.sleep(3)  # Pausa 3 segundos para limpiar la cuota y reintenta
+                        else:
+                            st.error(f"Error al conectar con la IA: {e}")
+                            break
