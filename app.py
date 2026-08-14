@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
-import replicate
-from PIL import Image, ImageDraw, ImageOps, ImageFont
-import time
+from PIL import Image, ImageDraw, ImageOps
+from gradio_client import Client, handle_file
+import tempfile
+import os
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -11,12 +12,10 @@ st.set_page_config(
     page_icon="👗"
 )
 
-# --- ESTILOS CSS PERSONALIZADOS (ESTÉTICA EDITORIAL DE LUJO) ---
+# --- ESTILOS CSS PERSONALIZADOS ---
 st.markdown("""
     <style>
-    .main {
-        background-color: #fafafa;
-    }
+    .main { background-color: #fafafa; }
     .stMetric {
         background-color: #ffffff;
         padding: 15px;
@@ -24,9 +23,7 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         border: 1px solid #eaeaea;
     }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
         border-radius: 8px;
@@ -45,9 +42,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- ENCABEZADO PRINCIPAL ---
+# --- ENCABEZADO ---
 st.title("👗 Atelier Virtual: Cotizador & Probador IA")
-st.caption("Plataforma profesional de diseño de prendas a la medida, cotización en tiempo real y fichas técnicas de visualización.")
+st.caption("Plataforma profesional de diseño a la medida, cotización en tiempo real y prueba virtual con IA.")
 st.markdown("---")
 
 # --- CATALOGOS Y TARIFAS ---
@@ -115,46 +112,33 @@ DETALLES_EXTRA = {
 
 COSTO_BASE_MANO_OBRA = 200.0
 
-# --- MOTOR DE FICHA TÉCNICA / MOODBOARD ELEGANTE ---
-def crear_moodboard_profesional(foto_cliente_file, foto_vestido_file, clienta, tela, silueta, escote):
+# --- RESPALDO: DOSSIER DE DISEÑO ---
+def crear_moodboard_profesional(foto_cliente_file, foto_vestido_file, clienta, tela, silueta):
     cliente_img = Image.open(foto_cliente_file).convert("RGB")
     vestido_img = Image.open(foto_vestido_file).convert("RGB")
     
-    # Dimensiones del lienzo
     canvas_w, canvas_h = 1000, 650
     canvas = Image.new("RGB", (canvas_w, canvas_h), "#111111")
     draw = ImageDraw.Draw(canvas)
     
-    # Procesar imágenes en marcos cuadrados/verticales estilizados
     frame_w, frame_h = 420, 500
     cliente_crop = ImageOps.fit(cliente_img, (frame_w, frame_h), method=Image.Resampling.LANCZOS)
     vestido_crop = ImageOps.fit(vestido_img, (frame_w, frame_h), method=Image.Resampling.LANCZOS)
     
-    # Pegar imágenes lado a lado con margen editorial
     canvas.paste(cliente_crop, (50, 90))
     canvas.paste(vestido_crop, (530, 90))
     
-    # Dibujar marcos de lujo
     draw.rectangle([(48, 88), (472, 592)], outline="#D4AF37", width=2)
     draw.rectangle([(528, 88), (952, 592)], outline="#D4AF37", width=2)
     
-    # Encabezado Ficha Técnica
-    draw.text((50, 35), "ATELIER HAUTE COUTURE — VISUAL DESIGN DOSSIER", fill="#FFFFFF")
+    draw.text((50, 35), "ATELIER HAUTE COUTURE — VISUAL DOSSIER", fill="#FFFFFF")
     draw.text((530, 35), f"CLIENTA: {clienta.upper()}", fill="#D4AF37")
-    
-    # Marcas al pie de imagen
-    draw.rectangle([(50, 555), (470, 590)], fill=(0, 0, 0, 180))
-    draw.rectangle([(530, 555), (950, 590)], fill=(0, 0, 0, 180))
-    
-    draw.text((65, 565), "PERFIL Y SILUETA BASE", fill="#E0E0E0")
-    draw.text((545, 565), f"DISEÑO: {silueta.split('/')[0]} | {tela.split()[0]}", fill="#E0E0E0")
-    
-    # Pie de página
-    draw.text((50, 612), f"Silueta: {silueta}  |  Escote: {escote}", fill="#888888")
+    draw.text((65, 565), "PERFIL BASE", fill="#E0E0E0")
+    draw.text((545, 565), f"PRENDA: {silueta.split('/')[0]}", fill="#E0E0E0")
     
     return canvas
 
-# --- LAYOUT PRINCIPAL (2 COLUMNAS) ---
+# --- LAYOUT PRINCIPAL ---
 col_formulario, col_resumen = st.columns([1.5, 1], gap="large")
 
 with col_formulario:
@@ -171,52 +155,32 @@ with col_formulario:
     with tab_telas:
         st.markdown("##### Selección de Textiles y Estructura")
         tela_sel = st.selectbox("Tipo de Tela Principal:", list(TELAS.keys()))
-        metros_sel = st.slider("Metros de tela requeridos:", min_value=2.0, max_value=12.0, value=4.5, step=0.5)
-        
-        st.markdown("---")
-        st.markdown("##### Refuerzo y Corsetería Interna")
-        estructura_sel = st.multiselect(
-            "Acabados e Interiores:",
-            list(ESTRUCTURA_INTERNA.keys()),
-            default=["Forro Estándar Suave"]
-        )
+        metros_sel = st.slider("Metros de tela requeridos:", 2.0, 12.0, 4.5, 0.5)
+        estructura_sel = st.multiselect("Acabados e Interiores:", list(ESTRUCTURA_INTERNA.keys()), default=["Forro Estándar Suave"])
 
     with tab_diseno:
         st.markdown("##### Silueta, Escote y Cortes")
-        corte_col1, corte_col2 = st.columns(2)
-        with corte_col1:
+        c1, c2 = st.columns(2)
+        with c1:
             silueta_sel = st.selectbox("Corte / Silueta:", list(SILUETAS.keys()))
             escote_sel = st.selectbox("Tipo de Escote:", list(ESCOTES.keys()))
-        with corte_col2:
+        with c2:
             espalda_sel = st.selectbox("Diseño de Espalda:", list(ESPALDAS.keys()))
             manga_sel = st.selectbox("Estilo de Mangas:", list(MANGAS.keys()))
 
     with tab_detalles:
         st.markdown("##### Aplicaciones y Adornos Hechos a Mano")
-        detalles_sel = st.multiselect(
-            "Selecciona los elementos decorativos adicionales:",
-            list(DETALLES_EXTRA.keys())
-        )
+        detalles_sel = st.multiselect("Selecciona los elementos decorativos:", list(DETALLES_EXTRA.keys()))
 
     with tab_servicio:
         st.markdown("##### Prioridad de Entrega y Experiencia")
-        tiempo_entrega = st.radio(
-            "Tiempo de Confección:",
-            ["Estándar (6 - 8 Semanas)", "Prioritario (3 - 4 Semanas) [ +15% ]", "Express de Emergencia (1 - 2 Semanas) [ +30% ]"]
-        )
-        
-        pruebas_sel = st.select_slider(
-            "Número de Pruebas de Vestuario (Fittings):",
-            options=["2 Pruebas (Incluidas)", "3 Pruebas (+ $40)", "5 Pruebas VIP con Diseñadora (+ $90)"]
-        )
+        tiempo_entrega = st.radio("Tiempo de Confección:", ["Estándar (6 - 8 Semanas)", "Prioritario (3 - 4 Semanas) [ +15% ]", "Express de Emergencia (1 - 2 Semanas) [ +30% ]"])
+        pruebas_sel = st.select_slider("Pruebas de Vestuario (Fittings):", options=["2 Pruebas (Incluidas)", "3 Pruebas (+ $40)", "5 Pruebas VIP (+ $90)"])
 
     with tab_probador:
-        st.markdown("##### Subir Imágenes para la Prueba Virtual")
-        foto_cliente = st.file_uploader("1. Foto de la Clienta (Cuerpo entero)", type=["jpg", "png", "jpeg"])
-        foto_vestido = st.file_uploader("2. Foto del Vestido / Prenda", type=["jpg", "png", "jpeg"])
-        
-        default_token = st.secrets.get("REPLICATE_API_TOKEN", "")
-        api_key = st.text_input("Replicate API Token (Opcional):", value=default_token, type="password")
+        st.markdown("##### Cargar Imágenes para IA (IDM-VTON)")
+        foto_cliente = st.file_uploader("1. Foto de la Persona (Cuerpo entero)", type=["jpg", "png", "jpeg"])
+        foto_vestido = st.file_uploader("2. Foto de la Prenda / Vestido", type=["jpg", "png", "jpeg"])
 
 # --- CÁLCULOS DE PRECIOS ---
 costo_materia_prima = TELAS[tela_sel] * metros_sel
@@ -224,132 +188,113 @@ costo_estructura = sum([ESTRUCTURA_INTERNA[item] for item in estructura_sel])
 costo_diseno = SILUETAS[silueta_sel] + ESCOTES[escote_sel] + ESPALDAS[espalda_sel] + MANGAS[manga_sel]
 costo_detalles = sum([DETALLES_EXTRA[item] for item in detalles_sel])
 
-costo_pruebas = 0.0
-if "3 Pruebas" in pruebas_sel:
-    costo_pruebas = 40.0
-elif "5 Pruebas" in pruebas_sel:
-    costo_pruebas = 90.0
-
+costo_pruebas = 40.0 if "3 Pruebas" in pruebas_sel else (90.0 if "5 Pruebas" in pruebas_sel else 0.0)
 subtotal = COSTO_BASE_MANO_OBRA + costo_materia_prima + costo_estructura + costo_diseno + costo_detalles + costo_pruebas
 
-multiplicador_urgencia = 1.0
-if "Prioritario" in tiempo_entrega:
-    multiplicador_urgencia = 1.15
-elif "Express" in tiempo_entrega:
-    multiplicador_urgencia = 1.30
-
+multiplicador_urgencia = 1.15 if "Prioritario" in tiempo_entrega else (1.30 if "Express" in tiempo_entrega else 1.0)
 precio_total_final = subtotal * multiplicador_urgencia
 recargo_urgencia_monto = precio_total_final - subtotal
 
-# --- COLUMNA DE RESUMEN & VISUALIZACIÓN ---
+# --- COLUMNA DERECHA: RESUMEN Y PROBADOR IA ---
 with col_resumen:
     st.subheader("📊 Resultados & Cotización")
     
-    # DATOS DE LA CLIENTA
     with st.expander("👤 Datos de la Clienta / Evento", expanded=True):
         nombre_clienta = st.text_input("Nombre de la Clienta:", value="María Fernanda López")
-        tipo_evento = st.selectbox("Tipo de Evento:", ["Boda / Novia", "Gala VIP", "Graduación", "XV Años / Quinceañera", "Cocktail de Lujo"])
+        tipo_evento = st.selectbox("Tipo de Evento:", ["Boda / Novia", "Gala VIP", "Graduación", "XV Años", "Cocktail"])
 
     st.markdown("---")
     
-    # MÉTRICA DE PRECIO TOTAL
     st.metric(
         label="💰 PRECIO TOTAL ESTIMADO", 
         value=f"${precio_total_final:,.2f} USD",
         delta=f"+${recargo_urgencia_monto:,.2f} USD por Urgencia" if recargo_urgencia_monto > 0 else "Precio Estándar"
     )
 
-    # BOTÓN PARA GENERAR LA FICHA VIRTUAL
-    btn_generar = st.button("✨ Generar Visualización & Ficha de Diseño", use_container_width=True, type="primary")
+    # BOTÓN DE PROBADOR VIRTUAL CON IA REAL
+    btn_generar = st.button("✨ Generar Probador Virtual con IA", use_container_width=True, type="primary")
     
     if btn_generar:
         if not foto_cliente or not foto_vestido:
-            st.warning("⚠️ Ve a la pestaña '5. Probador Virtual' y sube las imágenes requeridas.")
+            st.warning("⚠️ Sube la foto de la persona y la foto del vestido en la pestaña '5. Probador Virtual'.")
         else:
-            with st.spinner("Procesando dossier de diseño... (~2 segundos)"):
-                exito_api = False
+            with st.spinner("Procesando prueba virtual con IA en servidor Hugging Face (~15 seg)..."):
+                exito_ia = False
                 
-                # Intento API Replicate
-                if api_key:
-                    try:
-                        foto_cliente.seek(0)
-                        foto_vestido.seek(0)
-                        client = replicate.Client(api_token=api_key)
-                        output = client.run(
-                            "yisol/idm-vton:c871d0b19165cb70e7db9294191653f5383501f2e82f3c2f0f49f80a480572b8",
-                            input={
-                                "human_img": foto_cliente,
-                                "garm_img": foto_vestido,
-                                "description": f"A {silueta_sel} dress with {escote_sel} neckline",
-                                "category": "dresses"
-                            }
-                        )
-                        st.image(output, caption="✨ Probador Virtual con IA Generativa (Cloud)", use_container_width=True)
-                        st.success("¡Renderizado IA completado con éxito!")
-                        exito_api = True
-                    except Exception:
-                        exito_api = False
+                # Crear archivos temporales
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_model:
+                    f_model.write(foto_cliente.getvalue())
+                    model_path = f_model.name
 
-                # Ficha Técnica / Moodboard Editorial
-                if not exito_api:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_garm:
+                    f_garm.write(foto_vestido.getvalue())
+                    garm_path = f_garm.name
+
+                try:
+                    # Llamada a la IA gratuita de IDM-VTON
+                    client = Client("yisol/IDM-VTON")
+                    result = client.predict(
+                        dict={"background": handle_file(model_path), "layers": [], "composite": None},
+                        garm_img=handle_file(garm_path),
+                        garment_des="dress",
+                        is_checked=True,
+                        is_checked_crop=False,
+                        denoise_steps=30,
+                        seed=42,
+                        api_name="/tryon"
+                    )
+                    
+                    output_image_path = result[0]
+                    final_image = Image.open(output_image_path)
+                    st.image(final_image, caption="✨ Probador Virtual con IA Generativa (IDM-VTON)", use_container_width=True)
+                    st.success("¡Imagen generada con éxito por la IA!")
+                    exito_ia = True
+
+                except Exception as e:
+                    exito_ia = False
+
+                finally:
+                    if os.path.exists(model_path): os.remove(model_path)
+                    if os.path.exists(garm_path): os.remove(garm_path)
+
+                # Si el servidor gratuito de IA está saturation/ocupado, genera el dossier elegante
+                if not exito_ia:
                     foto_cliente.seek(0)
                     foto_vestido.seek(0)
-                    moodboard = crear_moodboard_profesional(
-                        foto_cliente, foto_vestido, nombre_clienta, tela_sel, silueta_sel, escote_sel
-                    )
-                    st.image(moodboard, caption="✨ Ficha Técnica de Diseño & Fitting (Atelier Suite)", use_container_width=True)
-                    st.success("¡Ficha de visualización personalizada generada con éxito!")
+                    moodboard = crear_moodboard_profesional(foto_cliente, foto_vestido, nombre_clienta, tela_sel, silueta_sel)
+                    st.image(moodboard, caption="✨ Dossier de Diseño & Comparativa Técnica", use_container_width=True)
+                    st.info("ℹ️ *Se desplegó la Ficha Técnica debido a alta demanda en los servidores de IA.*")
 
     st.markdown("---")
     st.markdown("##### 📈 Distribución de Costos")
     
-    # GRÁFICO DE COSTOS
     df_desglose = pd.DataFrame({
-        "Concepto": ["Confección", "Textil", "Corsetería", "Cortes/Diseño", "Detalles VIP", "Pruebas"],
+        "Concepto": ["Confección", "Textil", "Corsetería", "Diseño", "Detalles VIP", "Pruebas"],
         "Costo (USD)": [COSTO_BASE_MANO_OBRA, costo_materia_prima, costo_estructura, costo_diseno, costo_detalles, costo_pruebas]
     })
     st.bar_chart(df_desglose.set_index("Concepto"))
 
-    # DESGLOSE DESPLEGABLE
     with st.expander("🔍 Ver Desglose Detallado"):
         st.write(f"• **Confección Base:** ${COSTO_BASE_MANO_OBRA:.2f} USD")
-        st.write(f"• **Tela ({tela_sel} x {metros_sel}m):** ${costo_materia_prima:.2f} USD")
-        st.write(f"• **Corsetería/Forros:** ${costo_estructura:.2f} USD")
-        st.write(f"• **Personalización de Diseño:** ${costo_diseno:.2f} USD")
-        st.write(f"• **Bordados y Aplicaciones:** ${costo_detalles:.2f} USD")
-        st.write(f"• **Pruebas de Ajuste:** ${costo_pruebas:.2f} USD")
-        if recargo_urgencia_monto > 0:
-            st.write(f"• **Tarifa de Confección Acelerada:** ${recargo_urgencia_monto:.2f} USD")
+        st.write(f"• **Tela ({tela_sel}):** ${costo_materia_prima:.2f} USD")
+        st.write(f"• **Corsetería:** ${costo_estructura:.2f} USD")
+        st.write(f"• **Cortes/Diseño:** ${costo_diseno:.2f} USD")
+        st.write(f"• **Bordados/Detalles:** ${costo_detalles:.2f} USD")
+        st.write(f"• **Pruebas:** ${costo_pruebas:.2f} USD")
 
     # DESCARGAR COTIZACIÓN
     resumen_texto = f"""
     ==================================================
                  ATELIER VIRTUAL - COTIZACIÓN
     ==================================================
-    Clienta: {nombre_clienta}
-    Tipo de Evento: {tipo_evento}
+    Clienta: {nombre_clienta} | Evento: {tipo_evento}
     
     DETALLES DEL DISEÑO:
     - Tela: {tela_sel} ({metros_sel}m)
-    - Silueta: {silueta_sel}
-    - Escote: {escote_sel}
-    - Espalda: {espalda_sel}
-    - Mangas: {manga_sel}
-    - Estructura Interna: {', '.join(estructura_sel) if estructura_sel else 'Ninguna'}
-    - Adicionales: {', '.join(detalles_sel) if detalles_sel else 'Ninguno'}
-    - Tiempo de Entrega: {tiempo_entrega}
-    - Pruebas: {pruebas_sel}
+    - Silueta: {silueta_sel} | Escote: {escote_sel}
+    - Espalda: {espalda_sel} | Mangas: {manga_sel}
+    - Entrega: {tiempo_entrega} | Fittings: {pruebas_sel}
     
-    --------------------------------------------------
-    DESGLOSE ECONÓMICO:
-    - Confección Base: ${COSTO_BASE_MANO_OBRA:.2f} USD
-    - Tela: ${costo_materia_prima:.2f} USD
-    - Estructura/Forros: ${costo_estructura:.2f} USD
-    - Diseño y Cortes: ${costo_diseno:.2f} USD
-    - Detalles VIP: ${costo_detalles:.2f} USD
-    - Pruebas/Fittings: ${costo_pruebas:.2f} USD
-    - Recargo Urgencia: ${recargo_urgencia_monto:.2f} USD
-    --------------------------------------------------
     PRECIO TOTAL ESTIMADO: ${precio_total_final:,.2f} USD
     ==================================================
     """
