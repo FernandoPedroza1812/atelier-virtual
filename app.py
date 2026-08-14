@@ -64,13 +64,13 @@ with col_visualizador:
     api_key = st.text_input("Replicate API Token:", value=default_token, type="password")
 
     if st.button("✨ Generar Visualización con IA", use_container_width=True):
-        if modo_demo:
+       if modo_demo:
             # MODO DEMO: Genera un resultado instantáneo sin consumir la API
             with st.spinner("Procesando renderizado de la prenda... (~2 segundos)"):
                 time.sleep(2)
-                # Imagen de muestra de Virtual Try-On
+                # NUEVO ENLACE DE IMAGEN DE MUESTRA (Este enlace funciona)
                 st.image(
-                    "https://raw.githubusercontent.com/yisol/IDM-VTON/main/assets/examples/result_0.png", 
+                    "https://raw.githubusercontent.com/yisol/IDM-VTON/main/assets/demos/demo_2.png", 
                     caption="Resultado del Probador Virtual (Simulado para Presentación)", 
                     use_container_width=True
                 )
