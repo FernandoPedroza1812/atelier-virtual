@@ -1,3 +1,4 @@
 streamlit
 pandas
-replicate
+pillow
+gradio_client
