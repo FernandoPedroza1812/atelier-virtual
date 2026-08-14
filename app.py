@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import replicate
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw, ImageOps, ImageFont
 import time
 
 # --- CONFIGURACIÓN DE PÁGINA ---
@@ -11,7 +11,7 @@ st.set_page_config(
     page_icon="👗"
 )
 
-# --- ESTILOS CSS PERSONALIZADOS (ESTÉTICA DE LUJO) ---
+# --- ESTILOS CSS PERSONALIZADOS (ESTÉTICA EDITORIAL DE LUJO) ---
 st.markdown("""
     <style>
     .main {
@@ -47,7 +47,7 @@ st.markdown("""
 
 # --- ENCABEZADO PRINCIPAL ---
 st.title("👗 Atelier Virtual: Cotizador & Probador IA")
-st.caption("Plataforma profesional de diseño de prendas a la medida, cotización en tiempo real y prueba virtual.")
+st.caption("Plataforma profesional de diseño de prendas a la medida, cotización en tiempo real y fichas técnicas de visualización.")
 st.markdown("---")
 
 # --- CATALOGOS Y TARIFAS ---
@@ -115,34 +115,42 @@ DETALLES_EXTRA = {
 
 COSTO_BASE_MANO_OBRA = 200.0
 
-# --- MOTOR LOCAL DE FUSIÓN DE FOTOS (RESPALDO GARANTIZADO) ---
-def fusionar_imagenes_local(foto_cliente_file, foto_vestido_file, silueta, escote):
-    cliente = Image.open(foto_cliente_file).convert("RGBA")
-    vestido = Image.open(foto_vestido_file).convert("RGBA")
+# --- MOTOR DE FICHA TÉCNICA / MOODBOARD ELEGANTE ---
+def crear_moodboard_profesional(foto_cliente_file, foto_vestido_file, clienta, tela, silueta, escote):
+    cliente_img = Image.open(foto_cliente_file).convert("RGB")
+    vestido_img = Image.open(foto_vestido_file).convert("RGB")
     
-    target_w, target_h = 600, 850
-    cliente = ImageOps.fit(cliente, (target_w, target_h), method=Image.Resampling.LANCZOS)
-    
-    vestido_w = int(target_w * 0.55)
-    aspect = vestido.height / vestido.width
-    vestido_h = int(vestido_w * aspect)
-    if vestido_h > target_h * 0.58:
-        vestido_h = int(target_h * 0.58)
-        vestido_w = int(vestido_h / aspect)
-        
-    vestido_resized = vestido.resize((vestido_w, vestido_h), Image.Resampling.LANCZOS)
-    
-    canvas = cliente.copy()
-    pos_x = (target_w - vestido_w) // 2
-    pos_y = int(target_h * 0.27)
-    
-    if vestido_resized.mode == 'RGBA':
-        canvas.paste(vestido_resized, (pos_x, pos_y), vestido_resized)
-    else:
-        canvas.paste(vestido_resized, (pos_x, pos_y))
-        
+    # Dimensiones del lienzo
+    canvas_w, canvas_h = 1000, 650
+    canvas = Image.new("RGB", (canvas_w, canvas_h), "#111111")
     draw = ImageDraw.Draw(canvas)
-    draw.rectangle([(0, target_h - 45), (target_w, target_h)], fill=(15, 15, 15, 230))
+    
+    # Procesar imágenes en marcos cuadrados/verticales estilizados
+    frame_w, frame_h = 420, 500
+    cliente_crop = ImageOps.fit(cliente_img, (frame_w, frame_h), method=Image.Resampling.LANCZOS)
+    vestido_crop = ImageOps.fit(vestido_img, (frame_w, frame_h), method=Image.Resampling.LANCZOS)
+    
+    # Pegar imágenes lado a lado con margen editorial
+    canvas.paste(cliente_crop, (50, 90))
+    canvas.paste(vestido_crop, (530, 90))
+    
+    # Dibujar marcos de lujo
+    draw.rectangle([(48, 88), (472, 592)], outline="#D4AF37", width=2)
+    draw.rectangle([(528, 88), (952, 592)], outline="#D4AF37", width=2)
+    
+    # Encabezado Ficha Técnica
+    draw.text((50, 35), "ATELIER HAUTE COUTURE — VISUAL DESIGN DOSSIER", fill="#FFFFFF")
+    draw.text((530, 35), f"CLIENTA: {clienta.upper()}", fill="#D4AF37")
+    
+    # Marcas al pie de imagen
+    draw.rectangle([(50, 555), (470, 590)], fill=(0, 0, 0, 180))
+    draw.rectangle([(530, 555), (950, 590)], fill=(0, 0, 0, 180))
+    
+    draw.text((65, 565), "PERFIL Y SILUETA BASE", fill="#E0E0E0")
+    draw.text((545, 565), f"DISEÑO: {silueta.split('/')[0]} | {tela.split()[0]}", fill="#E0E0E0")
+    
+    # Pie de página
+    draw.text((50, 612), f"Silueta: {silueta}  |  Escote: {escote}", fill="#888888")
     
     return canvas
 
@@ -251,17 +259,17 @@ with col_resumen:
         delta=f"+${recargo_urgencia_monto:,.2f} USD por Urgencia" if recargo_urgencia_monto > 0 else "Precio Estándar"
     )
 
-    # BOTÓN PARA GENERAR EL PROBADOR VIRTUAL
-    btn_generar = st.button("✨ Generar Probador Virtual con tus Fotos", use_container_width=True, type="primary")
+    # BOTÓN PARA GENERAR LA FICHA VIRTUAL
+    btn_generar = st.button("✨ Generar Visualización & Ficha de Diseño", use_container_width=True, type="primary")
     
     if btn_generar:
         if not foto_cliente or not foto_vestido:
-            st.warning("⚠️ Ve a la pestaña '5. Probador Virtual' y sube la foto de la clienta y del vestido.")
+            st.warning("⚠️ Ve a la pestaña '5. Probador Virtual' y sube las imágenes requeridas.")
         else:
-            with st.spinner("Procesando renderizado y ajuste de la prenda... (~3 segundos)"):
+            with st.spinner("Procesando dossier de diseño... (~2 segundos)"):
                 exito_api = False
                 
-                # Intento 1: API de Replicate
+                # Intento API Replicate
                 if api_key:
                     try:
                         foto_cliente.seek(0)
@@ -276,24 +284,26 @@ with col_resumen:
                                 "category": "dresses"
                             }
                         )
-                        st.image(output, caption="✨ Probador Virtual en la Nube (IA Cloud)", use_container_width=True)
-                        st.success("¡Visualización generada con éxito!")
+                        st.image(output, caption="✨ Probador Virtual con IA Generativa (Cloud)", use_container_width=True)
+                        st.success("¡Renderizado IA completado con éxito!")
                         exito_api = True
                     except Exception:
                         exito_api = False
 
-                # Intento 2: Render Local (Sin fallas, con las fotos reales)
+                # Ficha Técnica / Moodboard Editorial
                 if not exito_api:
                     foto_cliente.seek(0)
                     foto_vestido.seek(0)
-                    resultado_pil = fusionar_imagenes_local(foto_cliente, foto_vestido, silueta_sel, escote_sel)
-                    st.image(resultado_pil, caption="✨ Renderizado de Prenda (Fusión Real de Fotos)", use_container_width=True)
-                    st.success("¡Visualización completada con éxito!")
+                    moodboard = crear_moodboard_profesional(
+                        foto_cliente, foto_vestido, nombre_clienta, tela_sel, silueta_sel, escote_sel
+                    )
+                    st.image(moodboard, caption="✨ Ficha Técnica de Diseño & Fitting (Atelier Suite)", use_container_width=True)
+                    st.success("¡Ficha de visualización personalizada generada con éxito!")
 
     st.markdown("---")
     st.markdown("##### 📈 Distribución de Costos")
     
-    # GRÁFICO DE BARRAS DE COSTOS
+    # GRÁFICO DE COSTOS
     df_desglose = pd.DataFrame({
         "Concepto": ["Confección", "Textil", "Corsetería", "Cortes/Diseño", "Detalles VIP", "Pruebas"],
         "Costo (USD)": [COSTO_BASE_MANO_OBRA, costo_materia_prima, costo_estructura, costo_diseno, costo_detalles, costo_pruebas]
