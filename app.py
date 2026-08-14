@@ -1,18 +1,19 @@
 import streamlit as st
 import pandas as pd
-from PIL import Image, ImageDraw, ImageOps
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
-    page_title="Atelier Virtual | Cotizador & Dossier de Diseño",
+    page_title="Atelier Virtual | Cotizador de Alta Costura",
     layout="wide",
     page_icon="👗"
 )
 
-# --- ESTILOS CSS PERSONALIZADOS (ESTÉTICA DE LUJO) ---
+# --- ESTILOS CSS PERSONALIZADOS (ESTÉICA DE LUJO) ---
 st.markdown("""
     <style>
-    .main { background-color: #fafafa; }
+    .main {
+        background-color: #fafafa;
+    }
     .stMetric {
         background-color: #ffffff;
         padding: 15px;
@@ -20,7 +21,9 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         border: 1px solid #eaeaea;
     }
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
         border-radius: 8px;
@@ -40,8 +43,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- ENCABEZADO PRINCIPAL ---
-st.title("👗 Atelier Virtual: Cotizador & Dossier de Diseño")
-st.caption("Plataforma profesional de diseño a la medida, cotización en tiempo real y fichas técnicas de visualización.")
+st.title("👗 Atelier Virtual: Cotizador de Alta Costura")
+st.caption("Sistema profesional de estimación de costos, personalización de prendas a la medida y presupuestos en tiempo real.")
 st.markdown("---")
 
 # --- CATALOGOS Y TARIFAS ---
@@ -107,59 +110,20 @@ DETALLES_EXTRA = {
     "Velo Cathedral a Juego (3 metros)": 130.0
 }
 
-COSTO_BASE_MANO_OBRA = 200.0
-
-# --- GENERADOR DE DOSSIER EDITORIAL / FICHA TÉCNICA ---
-def crear_dossier_profesional(foto_cliente_file, foto_vestido_file, clienta, tela, silueta, escote):
-    cliente_img = Image.open(foto_cliente_file).convert("RGB")
-    vestido_img = Image.open(foto_vestido_file).convert("RGB")
-    
-    # Dimensiones del lienzo
-    canvas_w, canvas_h = 1000, 650
-    canvas = Image.new("RGB", (canvas_w, canvas_h), "#111111")
-    draw = ImageDraw.Draw(canvas)
-    
-    # Procesar imágenes en marcos cuadrados/verticales estilizados
-    frame_w, frame_h = 420, 500
-    cliente_crop = ImageOps.fit(cliente_img, (frame_w, frame_h), method=Image.Resampling.LANCZOS)
-    vestido_crop = ImageOps.fit(vestido_img, (frame_w, frame_h), method=Image.Resampling.LANCZOS)
-    
-    # Pegar imágenes lado a lado con margen editorial
-    canvas.paste(cliente_crop, (50, 90))
-    canvas.paste(vestido_crop, (530, 90))
-    
-    # Dibujar marcos de lujo dorados
-    draw.rectangle([(48, 88), (472, 592)], outline="#D4AF37", width=2)
-    draw.rectangle([(528, 88), (952, 592)], outline="#D4AF37", width=2)
-    
-    # Encabezados
-    draw.text((50, 35), "ATELIER HAUTE COUTURE — VISUAL DOSSIER", fill="#FFFFFF")
-    draw.text((530, 35), f"CLIENTA: {clienta.upper()}", fill="#D4AF37")
-    
-    # Etiquetas en pie de foto
-    draw.rectangle([(50, 555), (470, 590)], fill=(0, 0, 0, 180))
-    draw.rectangle([(530, 555), (950, 590)], fill=(0, 0, 0, 180))
-    
-    draw.text((65, 565), "PERFIL Y SILUETA BASE", fill="#E0E0E0")
-    draw.text((545, 565), f"PRENDA: {silueta.split('/')[0]}", fill="#E0E0E0")
-    
-    # Pie de página técnico
-    draw.text((50, 612), f"Textil: {tela}  |  Silueta: {silueta}  |  Escote: {escote}", fill="#888888")
-    
-    return canvas
+COSTO_BASE_MANO_OBRA = 200.0  # Base de patronaje y confección
 
 # --- LAYOUT PRINCIPAL (2 COLUMNAS) ---
-col_formulario, col_resumen = st.columns([1.5, 1], gap="large")
+col_formulario, col_resumen = st.columns([1.6, 1], gap="large")
 
 with col_formulario:
-    st.subheader("🛠️ Personalización & Configuración")
+    st.subheader("🛠️ Configuración de la Prenda")
     
-    tab_telas, tab_diseno, tab_detalles, tab_servicio, tab_probador = st.tabs([
+    # PESTAÑAS PASO A PASO
+    tab_telas, tab_diseno, tab_detalles, tab_servicio = st.tabs([
         "1. 🧵 Materiales", 
-        "2. ✂️ Silueta", 
+        "2. ✂️ Silueta & Diseño", 
         "3. ✨ Detalles VIP", 
-        "4. ⏱️ Tiempo",
-        "5. 📸 Dossier Visual"
+        "4. ⏱️ Tiempo & Pruebas"
     ])
 
     with tab_telas:
@@ -176,7 +140,7 @@ with col_formulario:
         )
 
     with tab_diseno:
-        st.markdown("##### Silueta, Escote y Cortes")
+        st.markdown("##### Silueta y Cortes Principales")
         corte_col1, corte_col2 = st.columns(2)
         with corte_col1:
             silueta_sel = st.selectbox("Corte / Silueta:", list(SILUETAS.keys()))
@@ -204,11 +168,6 @@ with col_formulario:
             options=["2 Pruebas (Incluidas)", "3 Pruebas (+ $40)", "5 Pruebas VIP con Diseñadora (+ $90)"]
         )
 
-    with tab_probador:
-        st.markdown("##### Fotos de Referencia para Ficha Técnica")
-        foto_cliente = st.file_uploader("1. Foto de la Clienta / Modelo", type=["jpg", "png", "jpeg"])
-        foto_vestido = st.file_uploader("2. Foto de Referencia de la Prenda", type=["jpg", "png", "jpeg"])
-
 # --- CÁLCULOS DE PRECIOS ---
 costo_materia_prima = TELAS[tela_sel] * metros_sel
 costo_estructura = sum([ESTRUCTURA_INTERNA[item] for item in estructura_sel])
@@ -223,6 +182,7 @@ elif "5 Pruebas" in pruebas_sel:
 
 subtotal = COSTO_BASE_MANO_OBRA + costo_materia_prima + costo_estructura + costo_diseno + costo_detalles + costo_pruebas
 
+# Multiplicador por tiempo de entrega
 multiplicador_urgencia = 1.0
 if "Prioritario" in tiempo_entrega:
     multiplicador_urgencia = 1.15
@@ -232,51 +192,36 @@ elif "Express" in tiempo_entrega:
 precio_total_final = subtotal * multiplicador_urgencia
 recargo_urgencia_monto = precio_total_final - subtotal
 
-# --- COLUMNA DE RESUMEN & VISUALIZACIÓN ---
+# --- COLUMNA DE RESUMEN Y COTIZACIÓN ---
 with col_resumen:
-    st.subheader("📊 Resultados & Cotización")
+    st.subheader("📊 Cotización Oficial")
     
     # DATOS DE LA CLIENTA
     with st.expander("👤 Datos de la Clienta / Evento", expanded=True):
         nombre_clienta = st.text_input("Nombre de la Clienta:", value="María Fernanda López")
-        tipo_evento = st.selectbox("Tipo de Evento:", ["Boda / Novia", "Gala VIP", "Graduación", "XV Años / Quinceañera", "Cocktail de Lujo"])
+        tipo_evento = st.selectbox("Tipo de Evento:", ["Boda / Novia", "Gala / Copenhague", "Graduación VIP", "XV Años / Quinceañera", "Cocktail de Lujo"])
 
     st.markdown("---")
     
-    # MÉTRICA DE PRECIO TOTAL
+    # MÉTRICAS DESTACADAS
     st.metric(
         label="💰 PRECIO TOTAL ESTIMADO", 
         value=f"${precio_total_final:,.2f} USD",
         delta=f"+${recargo_urgencia_monto:,.2f} USD por Urgencia" if recargo_urgencia_monto > 0 else "Precio Estándar"
     )
 
-    # BOTÓN PARA GENERAR EL DOSSIER VISUAL
-    btn_generar = st.button("✨ Generar Ficha Técnica & Dossier Visual", use_container_width=True, type="primary")
+    st.markdown("##### 📈 Desglose Técnico de Costos")
     
-    if btn_generar:
-        if not foto_cliente or not foto_vestido:
-            st.warning("⚠️ Ve a la pestaña '5. Dossier Visual' y sube la foto de la clienta y de la prenda.")
-        else:
-            with st.spinner("Procesando dossier de diseño..."):
-                foto_cliente.seek(0)
-                foto_vestido.seek(0)
-                dossier_img = crear_dossier_profesional(
-                    foto_cliente, foto_vestido, nombre_clienta, tela_sel, silueta_sel, escote_sel
-                )
-                st.image(dossier_img, caption="✨ Dossier de Diseño & Comparativa Técnica (Atelier Suite)", use_container_width=True)
-                st.success("¡Ficha técnica generada con éxito!")
-
-    st.markdown("---")
-    st.markdown("##### 📈 Distribución de Costos")
-    
-    # GRÁFICO DE BARRAS DE COSTOS
+    # DATAFRAME PARA EL GRÁFICO Y TABLA
     df_desglose = pd.DataFrame({
-        "Concepto": ["Confección", "Textil", "Corsetería", "Cortes/Diseño", "Detalles VIP", "Pruebas"],
+        "Concepto": ["Confección Base", "Textil Principal", "Corsetería/Estructura", "Cortes y Diseño", "Bordados/Detalles", "Servicios/Pruebas"],
         "Costo (USD)": [COSTO_BASE_MANO_OBRA, costo_materia_prima, costo_estructura, costo_diseno, costo_detalles, costo_pruebas]
     })
+    
+    # GRÁFICO BARRAS STREAMLIT
     st.bar_chart(df_desglose.set_index("Concepto"))
 
-    # DESGLOSE DESPLEGABLE
+    # DETALLE DESPLEGABLE
     with st.expander("🔍 Ver Desglose Detallado"):
         st.write(f"• **Confección Base:** ${COSTO_BASE_MANO_OBRA:.2f} USD")
         st.write(f"• **Tela ({tela_sel} x {metros_sel}m):** ${costo_materia_prima:.2f} USD")
@@ -287,7 +232,7 @@ with col_resumen:
         if recargo_urgencia_monto > 0:
             st.write(f"• **Tarifa de Confección Acelerada:** ${recargo_urgencia_monto:.2f} USD")
 
-    # DESCARGAR COTIZACIÓN
+    # GENERAR ARCHIVO DE RESUMEN PARA DESCARGAR
     resumen_texto = f"""
     ==================================================
                  ATELIER VIRTUAL - COTIZACIÓN
