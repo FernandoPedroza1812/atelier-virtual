@@ -54,9 +54,8 @@ with col_controles:
 with col_visualizador:
     st.header("2. Probador Virtual (IA)")
     
-    # Interruptor para el modo Demo/A prueba de fallos
-    # Cambiado a value=True por defecto para garantizar éxito visual en la demo
-    modo_demo = st.toggle("🧪 Activar Modo Demo (Simulación rápida para presentación)", value=True)
+    # Interruptor para el modo Demo (Desactivado por defecto para usar IA REAL)
+    modo_demo = st.toggle("🧪 Activar Modo Demo (Simulación)", value=False)
     
     foto_cliente = st.file_uploader("Sube la foto de la clienta", type=["jpg", "png", "jpeg"])
     foto_vestido = st.file_uploader("Sube la foto/diseño del vestido", type=["jpg", "png", "jpeg"])
@@ -66,36 +65,41 @@ with col_visualizador:
 
     if st.button("✨ Generar Visualización con IA", use_container_width=True):
         if modo_demo:
-            # MODO DEMO: Muestra una imagen de marcador de posición garantizada y profesional
-            with st.spinner("Procesando renderizado de la prenda... (~2 segundos)"):
+            # MODO DEMO: Simulación rápida
+            with st.spinner("Procesando simulación... (~2 segundos)"):
                 time.sleep(2)
-                # NUEVO ENLACE DE IMAGEN DE MARCADOR DE POSICIÓN (Placeholder) robusto
                 st.image(
-                    "https://placehold.co/800x1200/png?text=Visualización+Simulada&font=raleway", 
-                    caption="Resultado del Probador Virtual (Simulado para Presentación)", 
+                    "https://placehold.co/800x1200/png?text=Visualizacion+Simulada", 
+                    caption="Resultado del Probador Virtual (Modo Demo)", 
                     use_container_width=True
                 )
-                st.success("¡Visualización completada con éxito!")
+                st.success("¡Visualización simulada completada!")
         else:
-            # MODO REAL: Llama a la API de Replicate
+            # MODO REAL: Procesa las fotos de la clienta y el vestido con IA
             if not foto_cliente or not foto_vestido:
-                st.warning("⚠️ Por favor sube ambas imágenes (Clienta y Vestido).")
+                st.warning("⚠️ Por favor sube ambas imágenes (Foto de la clienta y Foto del vestido).")
             elif not api_key:
-                st.error("🔑 Ingresa un API Token de Replicate para continuar.")
+                st.error("🔑 Ingresa un API Token de Replicate válido para continuar.")
             else:
-                with st.spinner("Procesando imagen con IA en la nube... (~10-15 segundos)"):
+                with st.spinner("🧠 La IA está vistiendo a la clienta con el diseño... (~12-15 segundos)"):
                     try:
+                        # Reiniciar el puntero de las imágenes subidas
+                        foto_cliente.seek(0)
+                        foto_vestido.seek(0)
+                        
                         client = replicate.Client(api_token=api_key)
+                        
                         output = client.run(
                             "yisol/idm-vton:c871d0b19165cb70e7db9294191653f5383501f2e82f3c2f0f49f80a480572b8",
                             input={
                                 "human_img": foto_cliente,
                                 "garm_img": foto_vestido,
-                                "description": f"A {corte} dress with {escote} neckline, made of {tela_seleccionada}"
+                                "description": f"A {corte} dress with {escote} neckline, made of {tela_seleccionada}",
+                                "category": "dresses"
                             }
                         )
-                        st.image(output, caption="Resultado del Probador Virtual con IA", use_container_width=True)
-                        st.success("¡Visualización completada con éxito!")
+                        st.image(output, caption="✨ Resultado Real del Probador Virtual con IA", use_container_width=True)
+                        st.success("¡Visualización generada con éxito por la IA!")
                     except Exception as e:
-                        st.error(f"Error en el servidor de la IA: {e}")
-                        st.info("💡 Tip: Activa el interruptor 'Modo Demo' arriba para realizar la demostración sin interrupciones.")
+                        st.error(f"Error al conectar con la IA: {e}")
+                        st.info("💡 Tip: Si te aparece un error de límite de peticiones (429), espera 5 segundos y vuelve a presionar el botón.")
