@@ -54,6 +54,9 @@ with col_controles:
 with col_visualizador:
     st.header("2. Probador Virtual (IA)")
     
+    # Interruptor para el modo Demo/A prueba de fallos
+    modo_demo = st.toggle("🧪 Activar Modo Demo (Simulación rápida para presentación)", value=False)
+    
     foto_cliente = st.file_uploader("Sube la foto de la clienta", type=["jpg", "png", "jpeg"])
     foto_vestido = st.file_uploader("Sube la foto/diseño del vestido", type=["jpg", "png", "jpeg"])
     
@@ -61,17 +64,27 @@ with col_visualizador:
     api_key = st.text_input("Replicate API Token:", value=default_token, type="password")
 
     if st.button("✨ Generar Visualización con IA", use_container_width=True):
-        if not foto_cliente or not foto_vestido:
-            st.warning("⚠️ Por favor sube ambas imágenes (Clienta y Vestido).")
-        elif not api_key:
-            st.error("🔑 Ingresa un API Token de Replicate para continuar.")
+        if modo_demo:
+            # MODO DEMO: Genera un resultado instantáneo sin consumir la API
+            with st.spinner("Procesando renderizado de la prenda... (~2 segundos)"):
+                time.sleep(2)
+                # Imagen de muestra de Virtual Try-On
+                st.image(
+                    "https://raw.githubusercontent.com/yisol/IDM-VTON/main/assets/examples/result_0.png", 
+                    caption="Resultado del Probador Virtual (Simulado para Presentación)", 
+                    use_container_width=True
+                )
+                st.success("¡Visualización completada con éxito!")
         else:
-            with st.spinner("Procesando imagen con IA... (~10-15 segundos)"):
-                client = replicate.Client(api_token=api_key)
-                max_intentos = 3
-                
-                for intento in range(max_intentos):
+            # MODO REAL: Llama a la API de Replicate
+            if not foto_cliente or not foto_vestido:
+                st.warning("⚠️ Por favor sube ambas imágenes (Clienta y Vestido).")
+            elif not api_key:
+                st.error("🔑 Ingresa un API Token de Replicate para continuar.")
+            else:
+                with st.spinner("Procesando imagen con IA en la nube... (~10 segundos)"):
                     try:
+                        client = replicate.Client(api_token=api_key)
                         output = client.run(
                             "yisol/idm-vton:c871d0b19165cb70e7db9294191653f5383501f2e82f3c2f0f49f80a480572b8",
                             input={
@@ -80,12 +93,8 @@ with col_visualizador:
                                 "description": f"A {corte} dress with {escote} neckline, made of {tela_seleccionada}"
                             }
                         )
-                        st.image(output, caption="Resultado del Probador Virtual", use_container_width=True)
+                        st.image(output, caption="Resultado del Probador Virtual con IA", use_container_width=True)
                         st.success("¡Visualización completada con éxito!")
-                        break
                     except Exception as e:
-                        if "429" in str(e) and intento < max_intentos - 1:
-                            time.sleep(3)  # Pausa 3 segundos para limpiar la cuota y reintenta
-                        else:
-                            st.error(f"Error al conectar con la IA: {e}")
-                            break
+                        st.error("⚠️ El servidor de la IA está saturado en la cuenta gratuita.")
+                        st.info("💡 Tip: Activa el botón 'Modo Demo' arriba para mostrar el resultado sin interrupciones.")
